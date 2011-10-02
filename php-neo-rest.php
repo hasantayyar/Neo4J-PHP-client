@@ -2,12 +2,16 @@
 
 //namespace NeoRest;
 
-class GraphDatabaseService
+class Neo4j
 {
 	var $base_uri;
 	
-	public function __construct($base_uri)
+	public function __construct($base_uri=null)
 	{
+		if($base_uri)
+			$this->base_uri = $base_uri.'db/data/';
+	}
+	public function setBaseUri($base_uri){
 		$this->base_uri = $base_uri.'db/data/';
 	}
 	
