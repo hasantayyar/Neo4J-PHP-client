@@ -1,15 +1,9 @@
 <?php
-/**
- *	Include the API PHP file
- */
 require('php-neo-rest.php');
 
-/**
- *	Create a graphDb connection 
- *	Note:	this does not actually perform any network access, 
- *			the server is only accessed when you use the database
- */
-$graphDb = new GraphDatabaseService('http://localhost:7474/');
+$graphDb = new Neo4j();
+$graphDb->setBaseUri('http://localhost:7474/');
+// there is no connection still
 
 
 /**
