@@ -8,8 +8,9 @@ class Neo4j
 	
 	public function __construct($base_uri=null)
 	{
-		if($base_uri)
+		if($base_uri){
 			$this->base_uri = $base_uri.'db/data/';
+		}
 	}
 	public function setBaseUri($base_uri){
 		$this->base_uri = $base_uri.'db/data/';

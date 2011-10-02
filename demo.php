@@ -1,59 +1,50 @@
 <?php
-require('php-neo-rest.php');
+/**
+ *	Include the API PHP file
+ */
+require('neo4j.class.php');
 
 $graphDb = new Neo4j();
 $graphDb->setBaseUri('http://localhost:7474/');
-// there is no connection still
 
-
-/**
- *	Lets create some nodes
- *	Note: Unlike the java API, these nodes are NOT saved until you call the save() method (see below)
- */
 $firstNode = $graphDb->createNode();
 $secondNode = $graphDb->createNode();
 $thirdNode = $graphDb->createNode();
 
-/**
- *	Assign some attributes to the nodes and save the,
- */
-$firstNode->message = "Hello, ";
-$firstNode->blah = "blah blah";
+
+
+
+$firstNode->name = "Hello, ";
+$firstNode->id = 123;
 $firstNode->save();
 
-$firstNode->blah = NULL;	// Setting to null removes the property
+$firstNode->id = NULL;	// Setting to null removes the property
 $firstNode->save();
 
 
-$secondNode->message = "world!";
-$secondNode->someOtherAttribute = 'blah blah blah';
+$secondNode->name = "world!";
+$secondNode->id = 345;
 $secondNode->save();
 
-$thirdNode->message = "third node";
+$thirdNode->id = 11;
 $thirdNode->save();
+
 
 /**
  *	Create a relationship between some nodes. These can also have attributes.
  *	Note: Relationships also need to be saved before they exist in the DB.
  */
 $relationship = $firstNode->createRelationshipTo($secondNode, 'KNOWS');
-$relationship->message = "brave Neo4j";
-$relationship->blah = "blah blah";
+$relationship->name = "brave Neo4j";
+$relationship->id = 222;
 $relationship->save();
 
-$relationship->blah = NULL; // Setting to NULL removed the property
+$relationship->id = NULL; // Setting to NULL removed the property
 $relationship->save();
 
-$relationship2 = $thirdNode->createRelationshipTo($secondNode, 'LOVES');
-$relationship2->save();
-
-/**
- *	Dump each node we created
- */
 dump_node($firstNode);
 dump_node($secondNode);
 dump_node($thirdNode);
-
 
 
 /**
