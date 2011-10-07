@@ -395,23 +395,19 @@ class Traversal {
     }
 
     /**
-     * curl -XPOST 'http://localhost:7474/db/data/node/25/traverse/node'  -H "Content-type: application/json"  -d '
-      {
-      "return_filter" : {
-      "body" : "position.length()<10;",
-      "language" : "javascript"
-      },
-      "prune_evaluator" : {
-      "name" : "none",
-      "language" : "builtin"
-      }
-      }'
+     *
+     * @param type $nodeId
+     * @param type $order 
+     * possible values
+     * breadth_first : http://en.wikipedia.org/wiki/Breadth-first_search
+     * depth_first : http://en.wikipedia.org/wiki/Depth-first_search
+     * @return type 
      */
-    public function getNodes($nodeId=null) {
+    public function getNodes($nodeId=null,$order = "breadth_first") {
         $params = array(
             "return_filter" => array("body" => "position.length()<" . $this->max_depth . ";", "language" => "javascript"),
             "prune_evaluator" => array("name" => "none", "language" => "builtin"),
-            "order" => "depth_first");
+            "order" => $order);
         $data = HTTPUtil::jsonPostRequest($this->_neo_db->getBaseUri() . 'node/' . $nodeId . "/traverse/node", $params);
         return $data;
     }
@@ -419,7 +415,7 @@ class Traversal {
 }
 
 /**
- * 	Very messy HTTP utility library
+ *     Very messy HTTP utility library
  */
 class HTTPUtil {
     const GET = 'GET';
