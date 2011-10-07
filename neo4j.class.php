@@ -5,371 +5,351 @@
  *  al.james@gmail.com
  * 
  */
-class Neo4j
-{
-	var $base_uri;
+class Neo4j {
 
-	public function __construct($base_uri=null)
-	{
-		if($base_uri){
-			$this->base_uri = $base_uri.'db/data/';
-		}
-	}
-	public function setBaseUri($base_uri){
-		$this->base_uri = $base_uri.'db/data/';
-	}
+    var $base_uri;
 
-	public function getNodeById($node_id)
-	{
-		$uri = $this->base_uri.'node/'.$node_id;
+    public function __construct($base_uri=null) {
+        if ($base_uri) {
+            $this->base_uri = $base_uri . 'db/data/';
+        }
+    }
+    /**
+     * @desc there is no connection still
+     * @param string$base_uri 
+     */
+    public function setBaseUri($base_uri) {
+        $this->base_uri = $base_uri . 'db/data/';
+    }
+    /**
+     *
+     * @param type $node_id
+     * @return  
+     */
+    public function getNodeById($node_id) {
+        $uri = $this->base_uri . 'node/' . $node_id;
 
-		list($response, $http_code) = HTTPUtil::jsonGetRequest($uri);
+        list($response, $http_code) = HTTPUtil::jsonGetRequest($uri);
 
-		switch ($http_code)
-		{
-			case 200:
-				return Node::inflateFromResponse($this, $response);
-			case 404:
-				throw new NotFoundException();
-			default:
-				throw new HttpException($http_code);
-		}
-	}
-        /**
-         * @desc must be exact match 
-         * @param string $key
-         * @param string $value
-         * @param string $index 
-         * @return node
-         */
-        public function getNodeByProperty($key, $value, $indexName = "node_auto_index"){
-            $uri = $this->base_uri.'/db/data/index/node/'.$indexName.'/'.$key.'/'.$value.'';
-            list($response, $http_code) = HTTPUtil::jsonGetRequest($uri);
-            switch ($http_code)
-		{
-			case 200:
-				return Node::inflateFromResponse($this, $response);
-			case 404:
-				throw new NotFoundException();
-			default:
-				throw new HttpException($http_code);
-		}
+        switch ($http_code) {
+            case 200:
+                return Node::inflateFromResponse($this, $response);
+            case 404:
+                throw new NotFoundException();
+            default:
+                throw new HttpException($http_code);
+        }
+    }
+
+    /**
+     * @desc must be exact match 
+     * @param string $key
+     * @param string $value
+     * @param string $index 
+     * @return node
+     */
+    public function getNodeByProperty($key, $value, $indexName = "node_auto_index") {
+        $uri = $this->base_uri . 'index/node/' . $indexName . '/' . $key . '/' . $value . '';
+        list($response, $http_code) = HTTPUtil::jsonGetRequest($uri);
+        switch ($http_code) {
+            case 200:
+                return Node::inflateFromResponse($this, $response[0]);
+            case 404:
+                throw new NotFoundException();
+            default:
+                throw new HttpException($http_code);
+        }
+    }
+
+    public function createNode() {
+        return new Node($this);
+    }
+
+    public function getBaseUri() {
+        return $this->base_uri;
+    }
+
+    public function performCypherQuery($query, $inflate_nodes=true) {
+        $uri = $this->base_uri . 'ext/CypherPlugin/graphdb/execute_query';
+        $data = array('query' => $query);
+
+        list($response, $http_code) = HTTPUtil::jsonPostRequest($uri, $data);
+
+        if ($inflate_nodes && $http_code == 200) {
+            // Process results to replace node object with actualy node objects
+
+            for ($i = 0; $i < count($response['data']); $i++) {
+                for ($j = 0; $j < count($response['data'][$i]); $j++) {
+                    if (is_array($response['data'][$i][$j]) && isset($response['data'][$i][$j]['data'])) {
+                        $response['data'][$i][$j] = Node::inflateFromResponse($this, $response['data'][$i][$j]);
+                    }
+                }
+            }
         }
 
-	public function createNode()
-	{
-		return new Node($this);
-	}
+        switch ($http_code) {
+            case 200:
+                return $response;
+            case 404:
+                throw new NotFoundException();
+            default:
+                throw new HttpException($http_code);
+        }
+    }
 
-	public function getBaseUri()
-	{
-		return $this->base_uri;
-	}
-
-	public function performCypherQuery($query, $inflate_nodes=true){ 
-		$uri = $this->base_uri.'ext/CypherPlugin/graphdb/execute_query';
-		$data = array('query'=>$query);
-
-		list($response, $http_code) = HTTPUtil::jsonPostRequest($uri, $data);
-
-		if ($inflate_nodes && $http_code==200) {
-			// Process results to replace node object with actualy node objects
-
-			for($i=0;$i<count($response['data']); $i++){
-				for($j=0;$j<count($response['data'][$i]); $j++) {
-					if (is_array($response['data'][$i][$j]) && isset($response['data'][$i][$j]['data'])) {
-						$response['data'][$i][$j] = Node::inflateFromResponse($this, $response['data'][$i][$j]);
-					}
-				}
-			}
-		}		
-
-		switch ($http_code)
-		{
-			case 200:
-				return $response;
-			case 404:
-				throw new NotFoundException();
-			default:
-				throw new HttpException($http_code);
-		}
-	}
 }
 
-class PropertyContainer
-{
-	var $_data;
+class PropertyContainer {
 
-	public function __set($k, $v)
-	{
-		if ($v===NULL && isset($this->_data[$k])) 
-			unset($this->_data[$k]);
-		else
-			$this->_data[$k] = $v;
-	}
+    var $_data;
 
-	public function __get($k)
-	{
-		if (isset($this->_data[$k]))
-			return $this->_data[$k];
-		else
-			return NULL;
-	}
+    public function __set($k, $v) {
+        if ($v === NULL && isset($this->_data[$k]))
+            unset($this->_data[$k]);
+        else
+            $this->_data[$k] = $v;
+    }
 
-	public function setProperties($data)
-	{
-		$this->_data = $data;
-	}
+    public function __get($k) {
+        if (isset($this->_data[$k]))
+            return $this->_data[$k];
+        else
+            return NULL;
+    }
 
-	public function getProperties()
-	{
-		return $this->_data;
-	}
+    public function setProperties($data) {
+        $this->_data = $data;
+    }
+
+    public function getProperties() {
+        return $this->_data;
+    }
+
 }
 
-class Node extends PropertyContainer
-{
-	var $_neo_db;
-	var $_id;
-	var $_is_new;
+class Node extends PropertyContainer {
 
-	public function __construct($neo_db)
-	{
-		$this->_neo_db = $neo_db;
-		$this->_is_new = TRUE;
-	}
+    var $_neo_db;
+    var $_id;
+    var $_is_new;
 
-	public function delete()
-	{
-		if (!$this->_is_new) 
-		{
-			list($response, $http_code) = HTTPUtil::deleteRequest($this->getUri());
+    public function __construct($neo_db) {
+        $this->_neo_db = $neo_db;
+        $this->_is_new = TRUE;
+    }
 
-			if ($http_code!=204) throw new HttpException($http_code);
+    public function delete() {
+        if (!$this->_is_new) {
+            list($response, $http_code) = HTTPUtil::deleteRequest($this->getUri());
 
-			$this->_id = NULL;
-			$this->_id_new = TRUE;
-		}
-	}
+            if ($http_code != 204)
+                throw new HttpException($http_code);
 
-	public function save()
-	{
-		if ($this->_is_new) {
-			list($response, $http_code) = HTTPUtil::jsonPostRequest($this->getUri(), $this->_data);
-			if ($http_code!=201) throw new HttpException($http_code);
-		} else {
-			list($response, $http_code) = HTTPUtil::jsonPutRequest($this->getUri().'/properties', $this->_data);
-			if ($http_code!=204) throw new HttpException($http_code);
-		}
+            $this->_id = NULL;
+            $this->_id_new = TRUE;
+        }
+    }
 
-		if ($this->_is_new) 
-		{
-			$this->_id = end(explode("/", $response['self']));
-			$this->_is_new=FALSE;
-		}
-	}
+    public function save() {
+        if ($this->_is_new) {
+            list($response, $http_code) = HTTPUtil::jsonPostRequest($this->getUri(), $this->_data);
+            if ($http_code != 201)
+                throw new HttpException($http_code);
+        } else {
+            list($response, $http_code) = HTTPUtil::jsonPutRequest($this->getUri() . '/properties', $this->_data);
+            if ($http_code != 204)
+                throw new HttpException($http_code);
+        }
 
-	public function getId()
-	{
-		return $this->_id;
-	}
+        if ($this->_is_new) {
+            $this->_id = end(explode("/", $response['self']));
+            $this->_is_new = FALSE;
+        }
+    }
 
-	public function isSaved()
-	{
-		return !$this->_is_new;
-	}
+    public function getId() {
+        return $this->_id;
+    }
 
-	public function getRelationships($direction=Relationship::DIRECTION_BOTH, $types=NULL)
-	{
-		$uri = $this->getUri().'/relationships';
+    public function isSaved() {
+        return!$this->_is_new;
+    }
 
-		switch($direction)
-		{
-			case Relationship::DIRECTION_IN:
-				$uri .= '/in';
-				break;
-			case Relationship::DIRECTION_OUT:
-				$uri .= '/out';
-				break;
-			default:
-				$uri .= '/all';
-		}
+    public function getRelationships($direction=Relationship::DIRECTION_BOTH, $types=NULL) {
+        $uri = $this->getUri() . '/relationships';
 
-		if ($types)
-		{
-			if (is_array($types)) $types = implode("&", $types);
+        switch ($direction) {
+            case Relationship::DIRECTION_IN:
+                $uri .= '/in';
+                break;
+            case Relationship::DIRECTION_OUT:
+                $uri .= '/out';
+                break;
+            default:
+                $uri .= '/all';
+        }
 
-			$uri .= '/'.$types;
-		}
+        if ($types) {
+            if (is_array($types))
+                $types = implode("&", $types);
 
-		list($response, $http_code) = HTTPUtil::jsonGetRequest($uri);
+            $uri .= '/' . $types;
+        }
 
-		$relationships = array();
+        list($response, $http_code) = HTTPUtil::jsonGetRequest($uri);
 
-		foreach($response as $result)
-		{
-			$relationships[] = Relationship::inflateFromResponse($this->_neo_db, $result);
-		}
+        $relationships = array();
 
-		return $relationships;
-	}
+        foreach ($response as $result) {
+            $relationships[] = Relationship::inflateFromResponse($this->_neo_db, $result);
+        }
 
-	public function createRelationshipTo($node, $type)
-	{
-		$relationship = new Relationship($this->_neo_db, $this, $node, $type);
-		return $relationship;
-	}
+        return $relationships;
+    }
 
-	public function getUri()
-	{
-		$uri = $this->_neo_db->getBaseUri().'node';
+    public function createRelationshipTo($node, $type) {
+        $relationship = new Relationship($this->_neo_db, $this, $node, $type);
+        return $relationship;
+    }
 
-		if (!$this->_is_new) $uri .= '/'.$this->getId();
+    public function getUri() {
+        $uri = $this->_neo_db->getBaseUri() . 'node';
 
-		return $uri;
-	}
+        if (!$this->_is_new)
+            $uri .= '/' . $this->getId();
 
-	public static function inflateFromResponse($neo_db, $response)
-	{
-		$node = new Node($neo_db);
-		$node->_is_new = FALSE;
-		$node->_id = end(explode("/", $response['self']));
-		$node->setProperties($response['data']);
+        return $uri;
+    }
 
-		return $node;
-	}
+    public static function inflateFromResponse($neo_db, $response) {
+        $node = new Node($neo_db);
+        $node->_is_new = FALSE;
+        $node->_id = end(explode("/", $response['self']));
+        $node->setProperties($response['data']);
+
+        return $node;
+    }
+
 }
 
-class Relationship extends PropertyContainer
-{
-	const DIRECTION_BOTH 	= 'BOTH';
-	const DIRECTION_IN 		= 'IN';
-	const DIRECTION_OUT 	= 'OUT';
+class Relationship extends PropertyContainer {
+    const DIRECTION_BOTH = 'BOTH';
+    const DIRECTION_IN = 'IN';
+    const DIRECTION_OUT = 'OUT';
 
-	var $_is_new;
-	var $_neo_db;
-	var $_id;
-	var $_type;
-	var $_node1;
-	var $_node2;
+    var $_is_new;
+    var $_neo_db;
+    var $_id;
+    var $_type;
+    var $_node1;
+    var $_node2;
 
-	public function __construct($neo_db, $start_node, $end_node, $type)
-	{
-		$this->_neo_db = $neo_db;
-		$this->_is_new = TRUE;
-		$this->_type = $type;
-		$this->_node1 = $start_node;
-		$this->_node2 = $end_node;
-	}
+    public function __construct($neo_db, $start_node, $end_node, $type) {
+        $this->_neo_db = $neo_db;
+        $this->_is_new = TRUE;
+        $this->_type = $type;
+        $this->_node1 = $start_node;
+        $this->_node2 = $end_node;
+    }
 
-	public function getId()
-	{
-		return $this->_id;
-	}
+    public function getId() {
+        return $this->_id;
+    }
 
-	public function isSaved()
-	{
-		return !$this->_is_new;
-	}
+    public function isSaved() {
+        return!$this->_is_new;
+    }
 
-	public function getType()
-	{
-		return $this->_type;		
-	}
+    public function getType() {
+        return $this->_type;
+    }
 
-	public function isType($type)
-	{
-		return $this->_type==$type;
-	}
+    public function isType($type) {
+        return $this->_type == $type;
+    }
 
-	public function getStartNode()
-	{
-		return $this->_node1;
-	}
+    public function getStartNode() {
+        return $this->_node1;
+    }
 
-	public function getEndNode()
-	{
-		return $this->_node2;
-	}
+    public function getEndNode() {
+        return $this->_node2;
+    }
 
-	public function getOtherNode($node)
-	{
-		return ($this->_node1->getId()==$node->getId()) ? $this->getStartNode() : $this->getEndNode();
-	}
+    public function getOtherNode($node) {
+        return ($this->_node1->getId() == $node->getId()) ? $this->getStartNode() : $this->getEndNode();
+    }
 
-	public function save()
-	{
-		if ($this->_is_new) {
-			$payload = array(
-				'to' => $this->getEndNode()->getUri(),
-				'type' => $this->_type,
-				'data'=>$this->_data
-			);
+    public function save() {
+        if ($this->_is_new) {
+            $payload = array(
+                'to' => $this->getEndNode()->getUri(),
+                'type' => $this->_type,
+                'data' => $this->_data
+            );
 
-			list($response, $http_code) = HTTPUtil::jsonPostRequest($this->getUri(), $payload);
+            list($response, $http_code) = HTTPUtil::jsonPostRequest($this->getUri(), $payload);
 
-			if ($http_code!=201) throw new HttpException($http_code);
-		} else {
-			list($response, $http_code) = HTTPUtil::jsonPutRequest($this->getUri().'/properties', $this->_data);
-			if ($http_code!=204) throw new HttpException($http_code);
-		}
+            if ($http_code != 201)
+                throw new HttpException($http_code);
+        } else {
+            list($response, $http_code) = HTTPUtil::jsonPutRequest($this->getUri() . '/properties', $this->_data);
+            if ($http_code != 204)
+                throw new HttpException($http_code);
+        }
 
-		if ($this->_is_new) 
-		{
-			$this->_id = end(explode("/", $response['self']));
-			$this->_is_new=FALSE;
-		}
-	}
+        if ($this->_is_new) {
+            $this->_id = end(explode("/", $response['self']));
+            $this->_is_new = FALSE;
+        }
+    }
 
-	public function delete()
-	{
-		if (!$this->_is_new) 
-		{
-			list($response, $http_code) = HTTPUtil::deleteRequest($this->getUri());
+    public function delete() {
+        if (!$this->_is_new) {
+            list($response, $http_code) = HTTPUtil::deleteRequest($this->getUri());
 
-			if ($http_code!=204) throw new HttpException($http_code);
+            if ($http_code != 204)
+                throw new HttpException($http_code);
 
-			$this->_id = NULL;
-			$this->_id_new = TRUE;
-		}
-	}
+            $this->_id = NULL;
+            $this->_id_new = TRUE;
+        }
+    }
 
-	public function getUri()
-	{
-		if ($this->_is_new)
-			$uri = $this->getStartNode()->getUri().'/relationships';
-		else
-			$uri  = $this->_neo_db->getBaseUri().'relationship/'.$this->getId();
+    public function getUri() {
+        if ($this->_is_new)
+            $uri = $this->getStartNode()->getUri() . '/relationships';
+        else
+            $uri = $this->_neo_db->getBaseUri() . 'relationship/' . $this->getId();
 
-		//if (!$this->_is_new) $uri .= '/'.$this->getId();
+        //if (!$this->_is_new) $uri .= '/'.$this->getId();
 
-		return $uri;
-	}
+        return $uri;
+    }
 
-	public static function inflateFromResponse($neo_db, $response)
-	{
-		$start_id = end(explode("/", $response['start']));
-		$end_id = end(explode("/", $response['end']));
+    public static function inflateFromResponse($neo_db, $response) {
+        $start_id = end(explode("/", $response['start']));
+        $end_id = end(explode("/", $response['end']));
 
-		$start = $neo_db->getNodeById($start_id);
-		$end = $neo_db->getNodeById($end_id);
+        $start = $neo_db->getNodeById($start_id);
+        $end = $neo_db->getNodeById($end_id);
 
-		$relationship = new Relationship($neo_db, $start, $end, $response['type']);
-		$relationship->_is_new = FALSE;
-		$relationship->_id = end(explode("/", $response['self']));
-		$relationship->setProperties($response['data']);
+        $relationship = new Relationship($neo_db, $start, $end, $response['type']);
+        $relationship->_is_new = FALSE;
+        $relationship->_id = end(explode("/", $response['self']));
+        $relationship->setProperties($response['data']);
 
-		return $relationship;
-	}
+        return $relationship;
+    }
+
 }
 
-
-class HttpException extends Exception
-{
+class HttpException extends Exception {
+    
 }
 
-class NotFoundException extends Exception
-{
+class NotFoundException extends Exception {
+    
 }
 
 /**
@@ -380,13 +360,14 @@ class Traversal {
       const RETURN_TYPE_RELATIONSHIP = 'relationship';
       const RETURN_TYPE_POSITION = 'position';
       const RETURN_TYPE_PATH = 'path'; */
+
     var $_neo_db;
     const RETURN_FILTER_ALL = 'all';
     const RETURN_FILTER_ALL_BUT_START_NODE = 'all but start node';
 
     const ORDER_DEPTH_FIRST = 'depth first';
     const ORDER_BREADTH_FIRST = 'breadth first';
-    
+
     public function __construct($neo_db) {
         $this->_neo_db = $neo_db;
     }
@@ -416,112 +397,103 @@ class Traversal {
     /**
      * curl -XPOST 'http://localhost:7474/db/data/node/25/traverse/node'  -H "Content-type: application/json"  -d '
       {
-          "return_filter" : {
-              "body" : "position.length()<10;",
-              "language" : "javascript"
-          },
-          "prune_evaluator" : {
-              "name" : "none",
-              "language" : "builtin"
-          }
+      "return_filter" : {
+      "body" : "position.length()<10;",
+      "language" : "javascript"
+      },
+      "prune_evaluator" : {
+      "name" : "none",
+      "language" : "builtin"
+      }
       }'
      */
     public function getNodes($nodeId=null) {
         $params = array(
-            "return_filter"=>array("body"=>"position.length()<".$this->max_depth.";","language"=>"javascript"),
-						"prune_evaluator"=>array("name"=>"none","language"=>"builtin"),
-						"order"=>"depth_first");
-				$data = HTTPUtil::jsonPostRequest($this->_neo_db->getBaseUri().'node/'.$nodeId."/traverse/node", $params);
+            "return_filter" => array("body" => "position.length()<" . $this->max_depth . ";", "language" => "javascript"),
+            "prune_evaluator" => array("name" => "none", "language" => "builtin"),
+            "order" => "depth_first");
+        $data = HTTPUtil::jsonPostRequest($this->_neo_db->getBaseUri() . 'node/' . $nodeId . "/traverse/node", $params);
         return $data;
     }
 
 }
 
-
-
 /**
- *	Very messy HTTP utility library
+ * 	Very messy HTTP utility library
  */
-class HTTPUtil 
-{
-	const GET = 'GET';
-	const POST = 'POST';
-	const PUT = 'PUT';
-	const DELETE = 'DELETE';
+class HTTPUtil {
+    const GET = 'GET';
+    const POST = 'POST';
+    const PUT = 'PUT';
+    const DELETE = 'DELETE';
 
-	/**
-	 *	A general purpose HTTP request method
-	 */
-	function request($url, $method='GET', $post_data='', $content_type='', $accept_type='')
-	{
-		// Uncomment for debugging
-		//echo 'HTTP: ', $method, " : " ,$url , " : ", $post_data, "\n";
-		echo $url;
+    /**
+     * 	A general purpose HTTP request method
+     */
+    function request($url, $method='GET', $post_data='', $content_type='', $accept_type='') {
+        // Uncomment for debugging
+        //echo 'HTTP: ', $method, " : " ,$url , " : ", $post_data, "\n";
+        echo $url;
 
-		$ch = curl_init();
-		curl_setopt($ch, CURLOPT_URL, $url);
-		curl_setopt($ch, CURLOPT_HEADER, 0);
-		curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE); 
-		curl_setopt($ch, CURLOPT_FOLLOWLOCATION,1);
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_HEADER, 0);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
 
 
-		//if ($method==self::POST){
-		//	curl_setopt($ch, CURLOPT_POST, true); 
-		//} else {
-		//	curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
-		//}
+        //if ($method==self::POST){
+        //	curl_setopt($ch, CURLOPT_POST, true); 
+        //} else {
+        //	curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+        //}
 
-		curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
 
-		if ($post_data)
-		{
-			curl_setopt($ch, CURLOPT_POSTFIELDS, $post_data);
+        if ($post_data) {
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $post_data);
 
-			$headers = array(
-						'Content-Length: ' . strlen($post_data),
-						'Content-Type: '.$content_type,
-						'Accept: '.$accept_type
-						);
-			curl_setopt($ch, CURLOPT_HTTPHEADER, $headers); 
-		}
-		
-		$response = curl_exec($ch);
+            $headers = array(
+                'Content-Length: ' . strlen($post_data),
+                'Content-Type: ' . $content_type,
+                'Accept: ' . $accept_type
+            );
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        }
 
-		$http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $response = curl_exec($ch);
 
-		curl_close($ch);
+        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 
-		return array($response, $http_code);
-	}
+        curl_close($ch);
 
-	/**
-	 *	A HTTP request that returns json and optionally sends a json payload (post only)
-	 */
-	function jsonRequest($url, $method, $data=NULL)
-	{
-		$json = json_encode($data);
-		$ret = self::request($url, $method, $json, 'application/json', 'application/json');
-		$ret[0] = json_decode($ret[0], TRUE);
-		return $ret;
-	}
+        return array($response, $http_code);
+    }
 
-	function jsonPutRequest($url, $data)
-	{
-		return self::jsonRequest($url, self::PUT, $data);
-	}
+    /**
+     * 	A HTTP request that returns json and optionally sends a json payload (post only)
+     */
+    function jsonRequest($url, $method, $data=NULL) {
+        $json = json_encode($data);
+        $ret = self::request($url, $method, $json, 'application/json', 'application/json');
+        $ret[0] = json_decode($ret[0], TRUE);
+        return $ret;
+    }
 
-	function jsonPostRequest($url, $data)
-	{
-		return self::jsonRequest($url, self::POST, $data);
-	}
+    function jsonPutRequest($url, $data) {
+        return self::jsonRequest($url, self::PUT, $data);
+    }
 
-	function jsonGetRequest($url)
-	{
-		return self::jsonRequest($url, self::GET);
-	}
+    function jsonPostRequest($url, $data) {
+        return self::jsonRequest($url, self::POST, $data);
+    }
 
-	function deleteRequest($url)
-	{
-		return self::request($url, self::DELETE);
-	}
+    function jsonGetRequest($url) {
+        return self::jsonRequest($url, self::GET);
+    }
+
+    function deleteRequest($url) {
+        return self::request($url, self::DELETE);
+    }
+
 }
